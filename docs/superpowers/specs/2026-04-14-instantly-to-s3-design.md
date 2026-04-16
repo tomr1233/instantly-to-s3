@@ -44,17 +44,19 @@ instantly-to-s3/
 
 ## Workflow: `InstantlyToS3Workflow`
 
-**Trigger:** Temporal schedule, weekly cadence.
+**Trigger:** Temporal schedule, runs weekly on Mondays at 00:00 UTC. Schedule is created on worker startup via Temporal's schedule API (idempotent — updates if already exists).
 
 **Steps:**
 
-1. Execute `fetch_campaigns` activity — calls `GET https://api.instantly.ai/api/v2/campaigns/analytics` with bearer token auth. Returns full response body.
-2. Parse response — extract the `body` array into a list of `CampaignData` models.
-3. For each campaign in the list:
+1. Execute `fetch_campaigns` activity — calls `GET https://api.instantly.ai/api/v2/campaigns/analytics` with bearer token auth. The activity parses the response `body` array and returns `list[CampaignData]`.
+2. For each campaign in the list:
    a. Execute `generate_report` activity — takes `CampaignData`, returns markdown string + campaign metadata.
-   b. Execute `upload_to_s3` activity — uploads the markdown string as a `.md` file to S3.
+   b. Build the S3 key in the workflow: `campaigns/instantly-campaigns/{campaign_name} {YYYY-MM-DD}.md` (date from workflow start time via `workflow.now()` to stay deterministic).
+   c. Execute `upload_to_s3` activity — uploads the markdown string as a `.md` file to S3.
 
 Each campaign iteration is independent. If one campaign fails after retries, the workflow logs the error and continues to the next campaign.
+
+**Re-runs:** If the workflow runs twice on the same day (manual trigger + schedule), the second run overwrites the same S3 keys. This is acceptable — markdown reports are regenerable and overwriting is idempotent.
 
 ## Activities
 
@@ -85,12 +87,12 @@ This is a direct port of the n8n Code node logic.
 
 ### `upload_to_s3`
 
-- **Input:** markdown content (str), S3 object key (str)
+- **Input:** markdown content (str), S3 object key (str) — key is built by the workflow and passed in
 - **Output:** None
 - **Side effects:** PUT object to S3
 - **Retry policy:** 3 attempts, backoff
 
-**S3 path format:** `campaigns/instantly-campaigns/{campaign_name} {YYYY-MM-DD}.md`
+**S3 path format:** `campaigns/instantly-campaigns/{campaign_name} {YYYY-MM-DD}.md` (built in the workflow using the deterministic workflow start time)
 
 **Bucket:** `expressnext-workspace`
 
