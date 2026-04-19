@@ -1,0 +1,37 @@
+services:
+  temporal:
+    image: temporalio/auto-setup:1.24
+    environment:
+      - DB=sqlite
+      - SKIP_SCHEMA_SETUP=false
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.27.0
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - temporal
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+    ports:
+      - "8000:8000"
+    depends_on:
+      - temporal
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+    command: ["python", "worker.py"]
+    depends_on:
+      - temporal
