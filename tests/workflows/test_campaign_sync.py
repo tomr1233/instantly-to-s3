@@ -182,3 +182,30 @@ async def test_workflow_uploads_leads_when_campaign_has_leads(fake_state):
     # Report uploads still happen
     report_uploads = [u for u in fake_state.uploads if u[2] == "text/markdown"]
     assert len(report_uploads) == 2
+
+
+async def test_workflow_skips_leads_export_when_leads_count_is_zero():
+    zero_lead_campaign = make_campaign("c_zero", "Zeta")
+    zero_lead_campaign = zero_lead_campaign.model_copy(update={"leads_count": 0})
+    state = FakeState([zero_lead_campaign])
+
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with Worker(
+            env.client,
+            task_queue="test-q",
+            workflows=[InstantlyToS3Workflow],
+            activities=build_fake_activities(state),
+            activity_executor=concurrent.futures.ThreadPoolExecutor(),
+        ):
+            await env.client.execute_workflow(
+                InstantlyToS3Workflow.run,
+                id="wf-zero-leads",
+                task_queue="test-q",
+            )
+
+    assert state.fetch_leads_calls == []
+    leads_uploads = [u for u in state.uploads if u[2] == "application/json"]
+    assert leads_uploads == []
+    # Report upload still happens
+    report_uploads = [u for u in state.uploads if u[2] == "text/markdown"]
+    assert len(report_uploads) == 1
