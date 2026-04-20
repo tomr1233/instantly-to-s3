@@ -48,3 +48,42 @@ async def test_upload_to_s3_overwrites_existing_object(aws_env):
 
         obj = s3.get_object(Bucket=BUCKET, Key=key)
         assert obj["Body"].read().decode("utf-8") == "second"
+
+
+async def test_upload_to_s3_defaults_to_markdown_content_type(aws_env):
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="ap-southeast-2")
+        s3.create_bucket(
+            Bucket=BUCKET,
+            CreateBucketConfiguration={"LocationConstraint": "ap-southeast-2"},
+        )
+
+        await upload_to_s3("# hello", "campaigns/instantly-campaigns/default-ct 2026-04-20.md")
+
+        obj = s3.get_object(
+            Bucket=BUCKET,
+            Key="campaigns/instantly-campaigns/default-ct 2026-04-20.md",
+        )
+        assert obj["ContentType"] == "text/markdown"
+
+
+async def test_upload_to_s3_honors_explicit_content_type(aws_env):
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="ap-southeast-2")
+        s3.create_bucket(
+            Bucket=BUCKET,
+            CreateBucketConfiguration={"LocationConstraint": "ap-southeast-2"},
+        )
+
+        await upload_to_s3(
+            "[]",
+            "campaigns/instantly-leads/explicit-ct 2026-04-20.json",
+            "application/json",
+        )
+
+        obj = s3.get_object(
+            Bucket=BUCKET,
+            Key="campaigns/instantly-leads/explicit-ct 2026-04-20.json",
+        )
+        assert obj["Body"].read().decode("utf-8") == "[]"
+        assert obj["ContentType"] == "application/json"
