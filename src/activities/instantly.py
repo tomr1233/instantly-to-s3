@@ -29,16 +29,26 @@ async def fetch_campaigns() -> list[CampaignData]:
 async def fetch_leads(campaign_id: str) -> LeadsPayload:
     settings = get_settings()
     headers = {"Authorization": f"Bearer {settings.instantly_api_key}"}
-    body = {"campaign": campaign_id, "limit": 100}
 
     collected: list[dict] = []
+    cursor: str | None = None
+
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            INSTANTLY_LEADS_URL, headers=headers, json=body
-        )
-        response.raise_for_status()
-        page = response.json()
-        collected.extend(page.get("items", []))
+        while True:
+            body: dict = {"campaign": campaign_id, "limit": 100}
+            if cursor is not None:
+                body["starting_after"] = cursor
+
+            response = await client.post(
+                INSTANTLY_LEADS_URL, headers=headers, json=body
+            )
+            response.raise_for_status()
+            page = response.json()
+            collected.extend(page.get("items", []))
+
+            cursor = page.get("next_starting_after")
+            if not cursor:
+                break
 
     return LeadsPayload(
         leads_json=json.dumps(collected),
