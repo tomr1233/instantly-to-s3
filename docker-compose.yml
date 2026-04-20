@@ -1,9 +1,7 @@
 services:
   temporal:
-    image: temporalio/auto-setup:1.24
-    environment:
-      - DB=sqlite
-      - SKIP_SCHEMA_SETUP=false
+    image: temporalio/temporal:latest
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "default"]
     ports:
       - "7233:7233"
 
@@ -13,7 +11,7 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     ports:
-      - "8080:8080"
+      - "8090:8080"
     depends_on:
       - temporal
 
@@ -23,7 +21,7 @@ services:
     environment:
       - TEMPORAL_HOST=temporal:7233
     ports:
-      - "8000:8000"
+      - "8010:8000"
     depends_on:
       - temporal
 

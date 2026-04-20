@@ -17,6 +17,5 @@ async def fetch_campaigns() -> list[CampaignData]:
         response = await client.get(INSTANTLY_ANALYTICS_URL, headers=headers)
         response.raise_for_status()
 
-    payload = response.json()
-    raw_list = payload.get("body", [])
+    raw_list = response.json()
     return [CampaignData(**raw) for raw in raw_list]
