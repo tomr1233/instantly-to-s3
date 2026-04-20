@@ -27,3 +27,8 @@ class ReportOutput(BaseModel):
     campaign_id: str
     campaign_name: str
     metrics: dict[str, str]
+
+
+class LeadsPayload(BaseModel):
+    leads_json: str
+    lead_count: int
