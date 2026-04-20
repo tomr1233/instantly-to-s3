@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import logging
 
 from temporalio.client import (
@@ -65,14 +66,16 @@ async def main() -> None:
 
     await ensure_schedule(client)
 
-    async with Worker(
-        client,
-        task_queue=settings.temporal_task_queue,
-        workflows=[InstantlyToS3Workflow],
-        activities=[fetch_campaigns, generate_report, upload_to_s3],
-    ):
-        logger.info("worker listening on task_queue=%s", settings.temporal_task_queue)
-        await asyncio.Event().wait()
+    with concurrent.futures.ThreadPoolExecutor() as activity_executor:
+        async with Worker(
+            client,
+            task_queue=settings.temporal_task_queue,
+            workflows=[InstantlyToS3Workflow],
+            activities=[fetch_campaigns, generate_report, upload_to_s3],
+            activity_executor=activity_executor,
+        ):
+            logger.info("worker listening on task_queue=%s", settings.temporal_task_queue)
+            await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
