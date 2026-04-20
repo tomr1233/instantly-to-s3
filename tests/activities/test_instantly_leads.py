@@ -74,3 +74,19 @@ async def test_fetch_leads_paginates_until_cursor_is_none():
     assert payload.lead_count == 3
     leads = json.loads(payload.leads_json)
     assert [lead["id"] for lead in leads] == ["lead_1", "lead_2", "lead_3"]
+
+
+@respx.mock
+async def test_fetch_leads_raises_when_page_cap_exceeded(monkeypatch):
+    import src.activities.instantly as module
+
+    monkeypatch.setattr(module, "MAX_LEADS_PAGES", 2)
+
+    responses = [
+        httpx.Response(200, json={"items": [{"id": "x"}], "next_starting_after": "c1"}),
+        httpx.Response(200, json={"items": [{"id": "y"}], "next_starting_after": "c2"}),
+    ]
+    respx.post(LEADS_URL).mock(side_effect=responses)
+
+    with pytest.raises(RuntimeError, match="exceeded 2 pages"):
+        await fetch_leads("camp_runaway")
