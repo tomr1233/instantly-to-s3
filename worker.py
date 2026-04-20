@@ -12,7 +12,7 @@ from temporalio.client import (
 )
 from temporalio.worker import Worker
 
-from src.activities.instantly import fetch_campaigns
+from src.activities.instantly import fetch_campaigns, fetch_leads
 from src.activities.report import generate_report
 from src.activities.s3 import upload_to_s3
 from src.config import get_settings
@@ -71,7 +71,7 @@ async def main() -> None:
             client,
             task_queue=settings.temporal_task_queue,
             workflows=[InstantlyToS3Workflow],
-            activities=[fetch_campaigns, generate_report, upload_to_s3],
+            activities=[fetch_campaigns, fetch_leads, generate_report, upload_to_s3],
             activity_executor=activity_executor,
         ):
             logger.info("worker listening on task_queue=%s", settings.temporal_task_queue)
