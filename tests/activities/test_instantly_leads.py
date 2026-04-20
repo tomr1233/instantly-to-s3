@@ -90,3 +90,25 @@ async def test_fetch_leads_raises_when_page_cap_exceeded(monkeypatch):
 
     with pytest.raises(RuntimeError, match="exceeded 2 pages"):
         await fetch_leads("camp_runaway")
+
+
+@respx.mock
+async def test_fetch_leads_empty_items():
+    respx.post(LEADS_URL).mock(
+        return_value=httpx.Response(
+            200, json={"items": [], "next_starting_after": None}
+        )
+    )
+
+    payload = await fetch_leads("camp_empty")
+
+    assert payload.lead_count == 0
+    assert payload.leads_json == "[]"
+
+
+@respx.mock
+async def test_fetch_leads_raises_on_http_error():
+    respx.post(LEADS_URL).mock(return_value=httpx.Response(500, text="boom"))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await fetch_leads("camp_err")
