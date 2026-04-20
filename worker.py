@@ -2,14 +2,13 @@ import asyncio
 import logging
 
 from temporalio.client import (
-    RPCError,
     Schedule,
     ScheduleActionStartWorkflow,
+    ScheduleAlreadyRunningError,
     ScheduleSpec,
     ScheduleUpdate,
     ScheduleUpdateInput,
 )
-from temporalio.service import RPCStatusCode
 from temporalio.worker import Worker
 
 from src.activities.instantly import fetch_campaigns
@@ -44,9 +43,7 @@ async def ensure_schedule(client) -> None:
     try:
         await client.create_schedule(SCHEDULE_ID, schedule)
         logger.info("created schedule %s", SCHEDULE_ID)
-    except RPCError as exc:
-        if exc.status != RPCStatusCode.ALREADY_EXISTS:
-            raise
+    except ScheduleAlreadyRunningError:
         handle = client.get_schedule_handle(SCHEDULE_ID)
 
         def updater(input: ScheduleUpdateInput) -> ScheduleUpdate:
