@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -75,7 +76,9 @@ def build_fake_activities(state: FakeState):
         if campaign_id in state.fail_fetch_leads_for:
             raise RuntimeError(f"forced fetch_leads failure for {campaign_id}")
         leads_json = state.leads_by_campaign.get(campaign_id, "[]")
-        return LeadsPayload(leads_json=leads_json, lead_count=leads_json.count("{"))
+        return LeadsPayload(
+            leads_json=leads_json, lead_count=len(json.loads(leads_json))
+        )
 
     return [fetch_campaigns, generate_report, upload_to_s3, fetch_leads]
 
