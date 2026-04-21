@@ -4,10 +4,10 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from src.activities.instantly import fetch_campaigns
+    from src.activities.instantly import fetch_campaigns, fetch_leads
     from src.activities.report import generate_report
     from src.activities.s3 import upload_to_s3
-    from src.models.campaign import CampaignData, ReportOutput
+    from src.models.campaign import CampaignData, LeadsPayload, ReportOutput
 
 
 FETCH_RETRY = RetryPolicy(
@@ -65,6 +65,34 @@ class InstantlyToS3Workflow:
                     report.campaign_id,
                     key,
                 )
+                if campaign.leads_count > 0:
+                    leads: LeadsPayload = await workflow.execute_activity(
+                        fetch_leads,
+                        campaign.campaign_id,
+                        start_to_close_timeout=timedelta(minutes=5),
+                        retry_policy=FETCH_RETRY,
+                    )
+                    leads_key = (
+                        f"campaigns/instantly-leads/"
+                        f"{campaign.campaign_name} {run_date}.json"
+                    )
+                    await workflow.execute_activity(
+                        upload_to_s3,
+                        args=[leads.leads_json, leads_key, "application/json"],
+                        start_to_close_timeout=timedelta(minutes=2),
+                        retry_policy=UPLOAD_RETRY,
+                    )
+                    workflow.logger.info(
+                        "uploaded leads for campaign_id=%s lead_count=%d key=%s",
+                        campaign.campaign_id,
+                        leads.lead_count,
+                        leads_key,
+                    )
+                else:
+                    workflow.logger.debug(
+                        "skipping leads export for campaign_id=%s (leads_count=0)",
+                        campaign.campaign_id,
+                    )
             except Exception as exc:  # noqa: BLE001
                 workflow.logger.exception(
                     "failed to process campaign_id=%s name=%s: %s",
