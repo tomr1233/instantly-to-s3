@@ -209,3 +209,32 @@ async def test_workflow_skips_leads_export_when_leads_count_is_zero():
     # Report upload still happens
     report_uploads = [u for u in state.uploads if u[2] == "text/markdown"]
     assert len(report_uploads) == 1
+
+
+async def test_workflow_continues_when_fetch_leads_fails(fake_state):
+    fake_state.fail_fetch_leads_for = {"c1"}  # Alpha's leads fetch blows up
+    fake_state.leads_by_campaign = {"c2": '[{"id":"lead_b"}]'}
+
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with Worker(
+            env.client,
+            task_queue="test-q",
+            workflows=[InstantlyToS3Workflow],
+            activities=build_fake_activities(fake_state),
+            activity_executor=concurrent.futures.ThreadPoolExecutor(),
+        ):
+            await env.client.execute_workflow(
+                InstantlyToS3Workflow.run,
+                id="wf-leads-fail",
+                task_queue="test-q",
+            )
+
+    # Alpha's report was uploaded before leads fetch blew up
+    report_keys = [u[0] for u in fake_state.uploads if u[2] == "text/markdown"]
+    assert any("Alpha" in k for k in report_keys)
+    assert any("Beta" in k for k in report_keys)
+
+    # Beta's leads were uploaded; Alpha's were not
+    leads_keys = [u[0] for u in fake_state.uploads if u[2] == "application/json"]
+    assert any("Beta" in k for k in leads_keys)
+    assert not any("Alpha" in k for k in leads_keys)
